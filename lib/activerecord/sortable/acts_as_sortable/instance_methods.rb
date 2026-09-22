@@ -20,18 +20,28 @@ module ActiveRecord
 
         def sortable_relation_shift_left(new_position)
           sortable_relation
-            .where(["#{escaped_sortable_position_column} > ? AND #{escaped_sortable_position_column} <= ?", send(sortable_position_column), new_position])
-            .update_all sortable_updates_with_timestamps("#{escaped_sortable_position_column} = #{escaped_sortable_position_column} - 1")
+            .where(
+              ["#{escaped_sortable_relation_table}.#{escaped_sortable_position_column} > ? AND #{escaped_sortable_relation_table}.#{escaped_sortable_position_column} <= ?",
+              send(sortable_position_column),
+              new_position])
+            .update_all sortable_updates_with_timestamps("#{escaped_sortable_position_column} = #{escaped_sortable_relation_table}.#{escaped_sortable_position_column} - 1")
         end
 
         def sortable_relation_shift_right(new_position)
           sortable_relation
-            .where(["#{escaped_sortable_position_column} >= ? AND #{escaped_sortable_position_column} < ?", new_position, send(sortable_position_column)])
-            .update_all sortable_updates_with_timestamps("#{escaped_sortable_position_column} = #{escaped_sortable_position_column} + 1")
+            .where(
+              ["#{escaped_sortable_relation_table}.#{escaped_sortable_position_column} >= ? AND #{escaped_sortable_relation_table}.#{escaped_sortable_position_column} < ?",
+              new_position,
+              send(sortable_position_column)])
+            .update_all sortable_updates_with_timestamps("#{escaped_sortable_position_column} = #{escaped_sortable_relation_table}.#{escaped_sortable_position_column} + 1")
         end
 
         def sortable_relation
           self.class.sortable_relation.call(self)
+        end
+
+        def escaped_sortable_relation_table
+          ActiveRecord::Base.connection.quote_table_name(sortable_relation.table_name)
         end
 
         def sortable_set_default_position
@@ -54,7 +64,8 @@ module ActiveRecord
         end
 
         def sortable_prepend_instance
-          sortable_relation.update_all sortable_updates_with_timestamps("#{escaped_sortable_position_column} = #{escaped_sortable_position_column} + 1")
+          sortable_relation.update_all sortable_updates_with_timestamps(
+            "#{escaped_sortable_position_column} = #{escaped_sortable_relation_table}.#{escaped_sortable_position_column} + 1")
           send("#{sortable_position_column}=".to_sym, 0)
         end
 
@@ -77,8 +88,10 @@ module ActiveRecord
 
         def sortable_shift_on_destroy
           position_threshold = send(sortable_position_column)
-          position_update = sortable_updates_with_timestamps("#{escaped_sortable_position_column} = #{escaped_sortable_position_column} - 1")
-          sortable_relation.where(["#{escaped_sortable_position_column} > ?", position_threshold]).update_all position_update
+          position_update = sortable_updates_with_timestamps(
+            "#{escaped_sortable_position_column} = #{escaped_sortable_relation_table}.#{escaped_sortable_position_column} - 1")
+          sortable_relation.where(["#{escaped_sortable_relation_table}.#{escaped_sortable_position_column} > ?", position_threshold])
+                           .update_all position_update
           true
         end
       end
